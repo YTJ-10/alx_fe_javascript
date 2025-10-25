@@ -513,16 +513,16 @@ async function syncWithServer() {
         // Show conflicts if any
         if (conflicts.length > 0) {
             showConflictNotification(conflicts);
+            showSyncNotification(`Sync completed with ${conflicts.length} conflicts!`, 'success');
         } else {
             hideConflictNotification();
+            // Show the specific success message
+            showSyncNotification('Quotes synced with server!', 'success');
         }
         
         // Refresh display
         populateCategories();
         displayFilteredQuotes();
-        
-        // Show success message
-        showSyncNotification(`Sync completed! ${sendResult.processed || 0} changes sent to server.`, 'success');
         
     } catch (error) {
         syncStatus.textContent = `Sync failed: ${error.message}`;
@@ -648,6 +648,8 @@ function showConflictResolution() {
     saveQuotesToLocalStorage();
     hideConflictNotification();
     displayFilteredQuotes();
+    // Show the specific success message after conflict resolution
+    showSyncNotification('Quotes synced with server!', 'success');
 }
 
 // Show sync notification
