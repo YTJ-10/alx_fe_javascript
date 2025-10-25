@@ -342,6 +342,66 @@ function startPeriodicSync() {
     syncInterval = setInterval(syncWithServer, 30000);
 }
 
+// Fetch quotes from server (simulated)
+async function fetchQuotesFromServer() {
+    try {
+        // Simulate API call to fetch quotes from server
+        console.log('Fetching quotes from server...');
+        
+        // In a real application, this would be an actual fetch call:
+        // const response = await fetch('https://api.example.com/quotes');
+        // const serverQuotes = await response.json();
+        
+        // For simulation, we'll create mock server data with some variations
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
+        
+        const serverQuotes = [
+            { 
+                id: 'server1', 
+                text: "The only way to do great work is to love what you do. (Server Enhanced)", 
+                category: "Inspiration", 
+                version: 2,
+                createdAt: new Date().toISOString()
+            },
+            { 
+                id: 'server2', 
+                text: "Innovation distinguishes between a leader and a follower.", 
+                category: "Leadership", 
+                version: 2,
+                createdAt: new Date().toISOString()
+            },
+            { 
+                id: 'server3', 
+                text: "Life is what happens to you while you're busy making other plans.", 
+                category: "Life", 
+                version: 1,
+                createdAt: new Date().toISOString()
+            },
+            { 
+                id: 'server4', 
+                text: "The future belongs to those who believe in the beauty of their dreams.", 
+                category: "Dreams", 
+                version: 1,
+                createdAt: new Date().toISOString()
+            },
+            { 
+                id: 'server5', 
+                text: "This is a new quote added from the server during synchronization.", 
+                category: "Motivation", 
+                version: 1,
+                createdAt: new Date().toISOString()
+            }
+        ];
+        
+        console.log('Successfully fetched quotes from server:', serverQuotes.length);
+        return serverQuotes;
+        
+    } catch (error) {
+        console.error('Error fetching quotes from server:', error);
+        throw new Error('Failed to fetch quotes from server: ' + error.message);
+    }
+}
+
 // Sync with server (simulated)
 async function syncWithServer() {
     const syncStatus = document.getElementById('syncStatus');
@@ -351,8 +411,8 @@ async function syncWithServer() {
         syncStatus.textContent = 'Syncing...';
         syncBtn.disabled = true;
         
-        // Simulate fetching from server
-        const serverQuotes = await fetchFromServer();
+        // Fetch quotes from server using the dedicated function
+        const serverQuotes = await fetchQuotesFromServer();
         
         // Merge server quotes with local quotes
         const conflicts = mergeQuotes(serverQuotes);
@@ -384,45 +444,6 @@ async function syncWithServer() {
     } finally {
         syncBtn.disabled = false;
     }
-}
-
-// Simulate fetching from server
-async function fetchFromServer() {
-    // In a real app, this would be an actual API call
-    // For simulation, we'll return a modified version of local quotes with some changes
-    
-    return new Promise((resolve) => {
-        setTimeout(() => {
-            // Simulate server response with some modifications
-            const serverQuotes = JSON.parse(JSON.stringify(quotes));
-            
-            // Simulate server-side changes
-            serverQuotes.forEach(quote => {
-                // Server increments version
-                quote.version = (quote.version || 1) + 1;
-                // Remove local modification flag (server has accepted changes)
-                delete quote.localModified;
-                
-                // Simulate occasional server modifications (10% chance)
-                if (Math.random() < 0.1 && quote.text) {
-                    quote.text = quote.text + ' (Server Enhanced)';
-                }
-            });
-            
-            // Simulate adding new quotes from server (20% chance)
-            if (Math.random() < 0.2) {
-                serverQuotes.push({
-                    id: generateId(),
-                    text: "This quote was added by the server during sync.",
-                    category: "System",
-                    version: 1,
-                    createdAt: new Date().toISOString()
-                });
-            }
-            
-            resolve(serverQuotes);
-        }, 1000); // Simulate network delay
-    });
 }
 
 // Merge server quotes with local quotes
