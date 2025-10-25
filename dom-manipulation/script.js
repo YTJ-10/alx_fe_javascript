@@ -339,7 +339,13 @@ function createSyncControls() {
 // Start periodic syncing
 function startPeriodicSync() {
     // Sync every 30 seconds
-    syncInterval = setInterval(syncWithServer, 30000);
+    syncInterval = setInterval(syncQuotes, 30000);
+}
+
+// Sync quotes function - handles periodic checking for new quotes from server
+function syncQuotes() {
+    console.log('Periodic sync checking for new quotes from server...');
+    syncWithServer();
 }
 
 // Fetch quotes from server (simulated)
@@ -497,7 +503,7 @@ async function syncWithServer() {
             }
         });
         
-        // Save merged quotes
+        // Save merged quotes to local storage
         saveQuotesToLocalStorage();
         
         // Update UI
@@ -585,6 +591,7 @@ function showConflictNotification(conflicts) {
     conflictNotification.innerHTML = `
         <strong>Conflict Detected!</strong> 
         ${conflicts.length} quote(s) have conflicts between local and server versions.
+        <br><small>Click "Resolve Conflicts" to review and resolve them.</small>
     `;
     conflictNotification.style.display = 'block';
     resolveBtn.style.display = 'inline-block';
@@ -623,6 +630,7 @@ function showConflictResolution() {
             const index = quotes.findIndex(q => q.id === conflict.id);
             if (index !== -1) {
                 quotes[index] = conflict.server;
+                showSyncNotification(`Resolved conflict for quote: "${conflict.server.text}"`, 'success');
             }
         });
     } else {
@@ -632,6 +640,7 @@ function showConflictResolution() {
             if (index !== -1) {
                 quotes[index].localModified = true;
                 quotes[index].version = Math.max(quotes[index].version, conflict.server.version) + 1;
+                showSyncNotification(`Kept local version for quote: "${quotes[index].text}"`, 'success');
             }
         });
     }
@@ -639,7 +648,6 @@ function showConflictResolution() {
     saveQuotesToLocalStorage();
     hideConflictNotification();
     displayFilteredQuotes();
-    showSyncNotification('Conflicts resolved!', 'success');
 }
 
 // Show sync notification
