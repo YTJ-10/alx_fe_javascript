@@ -1,6 +1,6 @@
 // Manage an array of quote objects
 let quotes = [];
-let currentFilter = 'all';
+let selectedCategory = 'all';
 
 // Initialize the application when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
@@ -46,8 +46,8 @@ function loadQuotesFromStorage() {
 function loadLastFilter() {
     const lastFilter = localStorage.getItem('lastFilter');
     if (lastFilter) {
-        currentFilter = lastFilter;
-        document.getElementById('categoryFilter').value = currentFilter;
+        selectedCategory = lastFilter;
+        document.getElementById('categoryFilter').value = selectedCategory;
     }
 }
 
@@ -58,7 +58,7 @@ function saveQuotesToLocalStorage() {
 
 // Save current filter to local storage
 function saveFilterToLocalStorage() {
-    localStorage.setItem('lastFilter', currentFilter);
+    localStorage.setItem('lastFilter', selectedCategory);
 }
 
 // Populate categories dynamically
@@ -82,13 +82,13 @@ function populateCategories() {
     });
     
     // Restore last selected filter
-    categoryFilter.value = currentFilter;
+    categoryFilter.value = selectedCategory;
 }
 
 // Filter quotes based on selected category
 function filterQuotes() {
     const categoryFilter = document.getElementById('categoryFilter');
-    currentFilter = categoryFilter.value;
+    selectedCategory = categoryFilter.value;
     
     // Save filter preference
     saveFilterToLocalStorage();
@@ -101,14 +101,14 @@ function filterQuotes() {
 function displayFilteredQuotes() {
     const quoteDisplay = document.getElementById('quoteDisplay');
     
-    // Filter quotes based on current selection
+    // Filter quotes based on selectedCategory
     let filteredQuotes = quotes;
-    if (currentFilter !== 'all') {
-        filteredQuotes = quotes.filter(quote => quote.category === currentFilter);
+    if (selectedCategory !== 'all') {
+        filteredQuotes = quotes.filter(quote => quote.category === selectedCategory);
     }
     
     if (filteredQuotes.length === 0) {
-        quoteDisplay.innerHTML = `<p>No quotes found in category "${currentFilter}".</p>`;
+        quoteDisplay.innerHTML = `<p>No quotes found in category "${selectedCategory}".</p>`;
         return;
     }
     
@@ -148,7 +148,7 @@ function displayFilterInfo(filteredCount) {
     }
     
     const totalCount = quotes.length;
-    const categoryText = currentFilter === 'all' ? 'All Categories' : currentFilter;
+    const categoryText = selectedCategory === 'all' ? 'All Categories' : selectedCategory;
     
     filterInfo.innerHTML = `
         <small>Showing ${filteredCount} of ${totalCount} quotes in "${categoryText}"</small>
@@ -159,14 +159,14 @@ function displayFilterInfo(filteredCount) {
 function showRandomQuote() {
     const quoteDisplay = document.getElementById('quoteDisplay');
     
-    // Filter quotes based on current selection
+    // Filter quotes based on selectedCategory
     let availableQuotes = quotes;
-    if (currentFilter !== 'all') {
-        availableQuotes = quotes.filter(quote => quote.category === currentFilter);
+    if (selectedCategory !== 'all') {
+        availableQuotes = quotes.filter(quote => quote.category === selectedCategory);
     }
     
     if (availableQuotes.length === 0) {
-        quoteDisplay.innerHTML = `<p>No quotes available in category "${currentFilter}".</p>`;
+        quoteDisplay.innerHTML = `<p>No quotes available in category "${selectedCategory}".</p>`;
         return;
     }
     
@@ -268,8 +268,8 @@ function addQuote() {
     // Show success message
     alert('Quote added successfully!');
     
-    // Refresh the display
-    if (currentFilter === 'all' || currentFilter === category) {
+    // Refresh the display if the new quote matches the current filter
+    if (selectedCategory === 'all' || selectedCategory === category) {
         displayFilteredQuotes();
     }
 }
