@@ -345,15 +345,32 @@ function startPeriodicSync() {
 // Fetch quotes from server (simulated)
 async function fetchQuotesFromServer() {
     try {
-        // Simulate API call to fetch quotes from server
         console.log('Fetching quotes from server...');
         
-        // In a real application, this would be an actual fetch call:
-        // const response = await fetch('https://api.example.com/quotes');
-        // const serverQuotes = await response.json();
+        // Simulate actual fetch call with POST method and headers
+        const response = await fetch(SERVER_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-API-Key': 'demo-key-12345',
+                'User-Agent': 'QuoteGenerator/1.0'
+            },
+            body: JSON.stringify({
+                action: 'getQuotes',
+                lastSync: lastSyncTime,
+                clientId: 'quote-generator-client'
+            })
+        });
         
-        // For simulation, we'll create mock server data with some variations
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate network delay
+        if (!response.ok) {
+            throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+        }
+        
+        const serverData = await response.json();
+        
+        // Since JSONPlaceholder returns mock data, we'll simulate our own server response
+        // In a real app, this would be the actual server response
+        await new Promise(resolve => setTimeout(resolve, 800)); // Simulate network delay
         
         const serverQuotes = [
             { 
@@ -361,35 +378,40 @@ async function fetchQuotesFromServer() {
                 text: "The only way to do great work is to love what you do. (Server Enhanced)", 
                 category: "Inspiration", 
                 version: 2,
-                createdAt: new Date().toISOString()
+                createdAt: new Date().toISOString(),
+                lastModified: new Date().toISOString()
             },
             { 
                 id: 'server2', 
                 text: "Innovation distinguishes between a leader and a follower.", 
                 category: "Leadership", 
                 version: 2,
-                createdAt: new Date().toISOString()
+                createdAt: new Date().toISOString(),
+                lastModified: new Date().toISOString()
             },
             { 
                 id: 'server3', 
                 text: "Life is what happens to you while you're busy making other plans.", 
                 category: "Life", 
                 version: 1,
-                createdAt: new Date().toISOString()
+                createdAt: new Date().toISOString(),
+                lastModified: new Date().toISOString()
             },
             { 
                 id: 'server4', 
                 text: "The future belongs to those who believe in the beauty of their dreams.", 
                 category: "Dreams", 
                 version: 1,
-                createdAt: new Date().toISOString()
+                createdAt: new Date().toISOString(),
+                lastModified: new Date().toISOString()
             },
             { 
                 id: 'server5', 
                 text: "This is a new quote added from the server during synchronization.", 
                 category: "Motivation", 
                 version: 1,
-                createdAt: new Date().toISOString()
+                createdAt: new Date().toISOString(),
+                lastModified: new Date().toISOString()
             }
         ];
         
@@ -402,6 +424,52 @@ async function fetchQuotesFromServer() {
     }
 }
 
+// Send local changes to server
+async function sendLocalChangesToServer() {
+    try {
+        const localChanges = quotes.filter(quote => quote.localModified);
+        
+        if (localChanges.length === 0) {
+            console.log('No local changes to send to server');
+            return { success: true, message: 'No changes to sync' };
+        }
+        
+        console.log(`Sending ${localChanges.length} local changes to server...`);
+        
+        // Simulate sending changes to server with POST method and headers
+        const response = await fetch(SERVER_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-API-Key': 'demo-key-12345',
+                'User-Agent': 'QuoteGenerator/1.0'
+            },
+            body: JSON.stringify({
+                action: 'updateQuotes',
+                changes: localChanges,
+                clientId: 'quote-generator-client',
+                syncTimestamp: new Date().toISOString()
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+        }
+        
+        const result = await response.json();
+        
+        // Simulate server processing
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        console.log('Successfully sent local changes to server');
+        return { success: true, processed: localChanges.length };
+        
+    } catch (error) {
+        console.error('Error sending changes to server:', error);
+        throw new Error('Failed to send changes to server: ' + error.message);
+    }
+}
+
 // Sync with server (simulated)
 async function syncWithServer() {
     const syncStatus = document.getElementById('syncStatus');
@@ -411,11 +479,23 @@ async function syncWithServer() {
         syncStatus.textContent = 'Syncing...';
         syncBtn.disabled = true;
         
-        // Fetch quotes from server using the dedicated function
+        // Step 1: Send local changes to server using POST method
+        const sendResult = await sendLocalChangesToServer();
+        
+        // Step 2: Fetch updated quotes from server
         const serverQuotes = await fetchQuotesFromServer();
         
-        // Merge server quotes with local quotes
+        // Step 3: Merge server quotes with local quotes
         const conflicts = mergeQuotes(serverQuotes);
+        
+        // Step 4: Clear local modification flags for successfully synced quotes
+        quotes.forEach(quote => {
+            if (quote.localModified) {
+                // In a real app, this would only happen after server confirms receipt
+                // For simulation, we'll clear the flag
+                delete quote.localModified;
+            }
+        });
         
         // Save merged quotes
         saveQuotesToLocalStorage();
@@ -436,7 +516,7 @@ async function syncWithServer() {
         displayFilteredQuotes();
         
         // Show success message
-        showSyncNotification('Sync completed successfully!', 'success');
+        showSyncNotification(`Sync completed! ${sendResult.processed || 0} changes sent to server.`, 'success');
         
     } catch (error) {
         syncStatus.textContent = `Sync failed: ${error.message}`;
