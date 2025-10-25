@@ -9,11 +9,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Add event listener to "Show New Quote" button
     document.getElementById('newQuote').addEventListener('click', showRandomQuote);
     
-    // Create the add quote form
+    // Create the add quote form (this will be created dynamically)
     createAddQuoteForm();
-    
-    // Create export/import controls
-    createDataManagementControls();
     
     // Add styling
     addStyles();
@@ -170,30 +167,6 @@ function addQuote() {
     showRandomQuote();
 }
 
-// Create data management controls (export/import)
-function createDataManagementControls() {
-    const controlsContainer = document.createElement('div');
-    controlsContainer.id = 'dataControls';
-    controlsContainer.className = 'data-controls';
-    
-    controlsContainer.innerHTML = `
-        <h3>Data Management</h3>
-        <button onclick="exportToJson()" class="export-btn">Export Quotes to JSON</button>
-        <div class="import-section">
-            <label for="importFile">Import Quotes from JSON:</label>
-            <input type="file" id="importFile" accept=".json" />
-            <button onclick="importFromJson()" class="import-btn">Import Quotes</button>
-        </div>
-        <div class="storage-info">
-            <small>Quotes stored: ${quotes.length} | Local Storage: ${localStorage.getItem('quotes') ? 'Active' : 'Inactive'}</small>
-        </div>
-    `;
-    
-    // Insert after the add quote form
-    const addQuoteForm = document.getElementById('addQuoteForm');
-    addQuoteForm.parentNode.insertBefore(controlsContainer, addQuoteForm.nextSibling);
-}
-
 // Export quotes to JSON file
 function exportToJson() {
     if (quotes.length === 0) {
@@ -309,7 +282,7 @@ function addStyles() {
         button:hover {
             background-color: #0056b3;
         }
-        .form-container, .data-controls {
+        .form-container, #dataControls {
             margin: 20px 0;
             padding: 15px;
             border: 1px solid #ddd;
@@ -329,26 +302,13 @@ function addStyles() {
             outline: none;
             border-color: #007bff;
         }
-        .session-info, .storage-info {
+        .session-info {
             margin: 10px 0;
             color: #666;
             font-size: 0.9em;
         }
         .import-section {
             margin: 15px 0;
-        }
-        .export-btn {
-            background-color: #28a745;
-        }
-        .export-btn:hover {
-            background-color: #218838;
-        }
-        .import-btn {
-            background-color: #ffc107;
-            color: #212529;
-        }
-        .import-btn:hover {
-            background-color: #e0a800;
         }
         h3 {
             margin-top: 0;
