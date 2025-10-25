@@ -1,6 +1,8 @@
 // Manage an array of quote objects
 let quotes = [];
 let selectedCategory = 'all';
+let lastSyncTime = null;
+let syncInterval = null;
 
 // Initialize the application when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
@@ -18,28 +20,52 @@ document.addEventListener('DOMContentLoaded', function() {
     // Create the add quote form
     createAddQuoteForm();
     
+    // Create sync controls
+    createSyncControls();
+    
+    // Start periodic syncing
+    startPeriodicSync();
+    
     // Add styling
     addStyles();
 });
 
+// Simulated server URL (using JSONPlaceholder for posts simulation)
+const SERVER_URL = 'https://jsonplaceholder.typicode.com/posts';
+
 // Load quotes from local storage
 function loadQuotesFromStorage() {
     const storedQuotes = localStorage.getItem('quotes');
+    const storedSyncTime = localStorage.getItem('lastSyncTime');
+    
     if (storedQuotes) {
         quotes = JSON.parse(storedQuotes);
     } else {
         // Initialize with default quotes if no stored quotes
         quotes = [
-            { text: "The only way to do great work is to love what you do.", category: "Inspiration" },
-            { text: "Innovation distinguishes between a leader and a follower.", category: "Leadership" },
-            { text: "Life is what happens to you while you're busy making other plans.", category: "Life" },
-            { text: "The future belongs to those who believe in the beauty of their dreams.", category: "Dreams" }
+            { text: "The only way to do great work is to love what you do.", category: "Inspiration", id: generateId(), version: 1 },
+            { text: "Innovation distinguishes between a leader and a follower.", category: "Leadership", id: generateId(), version: 1 },
+            { text: "Life is what happens to you while you're busy making other plans.", category: "Life", id: generateId(), version: 1 },
+            { text: "The future belongs to those who believe in the beauty of their dreams.", category: "Dreams", id: generateId(), version: 1 }
         ];
         saveQuotesToLocalStorage();
     }
     
+    lastSyncTime = storedSyncTime || new Date().toISOString();
+    
     // Store last load time in session storage
     sessionStorage.setItem('lastLoaded', new Date().toLocaleString());
+}
+
+// Generate unique ID for quotes
+function generateId() {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2);
+}
+
+// Save quotes to local storage
+function saveQuotesToLocalStorage() {
+    localStorage.setItem('quotes', JSON.stringify(quotes));
+    localStorage.setItem('lastSyncTime', lastSyncTime);
 }
 
 // Load last selected filter from local storage
@@ -49,11 +75,6 @@ function loadLastFilter() {
         selectedCategory = lastFilter;
         document.getElementById('categoryFilter').value = selectedCategory;
     }
-}
-
-// Save quotes to local storage
-function saveQuotesToLocalStorage() {
-    localStorage.setItem('quotes', JSON.stringify(quotes));
 }
 
 // Save current filter to local storage
@@ -127,6 +148,14 @@ function displayFilteredQuotes() {
         const categoryElement = document.createElement('p');
         categoryElement.textContent = `- ${quote.category}`;
         categoryElement.className = 'quote-category';
+        
+        // Add sync indicator if quote has been modified locally
+        if (quote.localModified) {
+            const syncIndicator = document.createElement('span');
+            syncIndicator.textContent = ' ⚡ (Pending Sync)';
+            syncIndicator.className = 'sync-indicator';
+            categoryElement.appendChild(syncIndicator);
+        }
         
         quoteElement.appendChild(textElement);
         quoteElement.appendChild(categoryElement);
@@ -249,8 +278,15 @@ function addQuote() {
         return;
     }
     
-    // Create new quote object
-    const newQuote = { text: text, category: category };
+    // Create new quote object with sync metadata
+    const newQuote = { 
+        text: text, 
+        category: category,
+        id: generateId(),
+        version: 1,
+        localModified: true,
+        createdAt: new Date().toISOString()
+    };
     
     // Add to quotes array
     quotes.push(newQuote);
@@ -266,12 +302,264 @@ function addQuote() {
     categoryInput.value = '';
     
     // Show success message
-    alert('Quote added successfully!');
+    alert('Quote added successfully! It will be synced with the server.');
     
     // Refresh the display if the new quote matches the current filter
     if (selectedCategory === 'all' || selectedCategory === category) {
         displayFilteredQuotes();
     }
+    
+    // Trigger sync
+    syncWithServer();
+}
+
+// Create sync controls
+function createSyncControls() {
+    const syncContainer = document.createElement('div');
+    syncContainer.id = 'syncControls';
+    syncContainer.className = 'sync-controls';
+    
+    syncContainer.innerHTML = `
+        <h3>Data Synchronization</h3>
+        <button id="manualSync" class="sync-btn">Sync Now</button>
+        <button id="resolveConflicts" class="resolve-btn" style="display: none;">Resolve Conflicts</button>
+        <div id="syncStatus" class="sync-status">Last sync: ${lastSyncTime ? new Date(lastSyncTime).toLocaleString() : 'Never'}</div>
+        <div id="conflictNotification" class="conflict-notification" style="display: none;"></div>
+    `;
+    
+    // Insert before data controls
+    const dataControls = document.getElementById('dataControls');
+    dataControls.parentNode.insertBefore(syncContainer, dataControls);
+    
+    // Add event listeners
+    document.getElementById('manualSync').addEventListener('click', syncWithServer);
+    document.getElementById('resolveConflicts').addEventListener('click', showConflictResolution);
+}
+
+// Start periodic syncing
+function startPeriodicSync() {
+    // Sync every 30 seconds
+    syncInterval = setInterval(syncWithServer, 30000);
+}
+
+// Sync with server (simulated)
+async function syncWithServer() {
+    const syncStatus = document.getElementById('syncStatus');
+    const syncBtn = document.getElementById('manualSync');
+    
+    try {
+        syncStatus.textContent = 'Syncing...';
+        syncBtn.disabled = true;
+        
+        // Simulate fetching from server
+        const serverQuotes = await fetchFromServer();
+        
+        // Merge server quotes with local quotes
+        const conflicts = mergeQuotes(serverQuotes);
+        
+        // Save merged quotes
+        saveQuotesToLocalStorage();
+        
+        // Update UI
+        lastSyncTime = new Date().toISOString();
+        syncStatus.textContent = `Last sync: ${new Date(lastSyncTime).toLocaleString()}`;
+        
+        // Show conflicts if any
+        if (conflicts.length > 0) {
+            showConflictNotification(conflicts);
+        } else {
+            hideConflictNotification();
+        }
+        
+        // Refresh display
+        populateCategories();
+        displayFilteredQuotes();
+        
+        // Show success message
+        showSyncNotification('Sync completed successfully!', 'success');
+        
+    } catch (error) {
+        syncStatus.textContent = `Sync failed: ${error.message}`;
+        showSyncNotification('Sync failed!', 'error');
+    } finally {
+        syncBtn.disabled = false;
+    }
+}
+
+// Simulate fetching from server
+async function fetchFromServer() {
+    // In a real app, this would be an actual API call
+    // For simulation, we'll return a modified version of local quotes with some changes
+    
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            // Simulate server response with some modifications
+            const serverQuotes = JSON.parse(JSON.stringify(quotes));
+            
+            // Simulate server-side changes
+            serverQuotes.forEach(quote => {
+                // Server increments version
+                quote.version = (quote.version || 1) + 1;
+                // Remove local modification flag (server has accepted changes)
+                delete quote.localModified;
+                
+                // Simulate occasional server modifications (10% chance)
+                if (Math.random() < 0.1 && quote.text) {
+                    quote.text = quote.text + ' (Server Enhanced)';
+                }
+            });
+            
+            // Simulate adding new quotes from server (20% chance)
+            if (Math.random() < 0.2) {
+                serverQuotes.push({
+                    id: generateId(),
+                    text: "This quote was added by the server during sync.",
+                    category: "System",
+                    version: 1,
+                    createdAt: new Date().toISOString()
+                });
+            }
+            
+            resolve(serverQuotes);
+        }, 1000); // Simulate network delay
+    });
+}
+
+// Merge server quotes with local quotes
+function mergeQuotes(serverQuotes) {
+    const conflicts = [];
+    const mergedQuotes = [];
+    const quoteMap = new Map();
+    
+    // Add all server quotes to map
+    serverQuotes.forEach(quote => {
+        quoteMap.set(quote.id, { ...quote, source: 'server' });
+    });
+    
+    // Merge with local quotes
+    quotes.forEach(localQuote => {
+        const serverQuote = quoteMap.get(localQuote.id);
+        
+        if (serverQuote) {
+            // Quote exists on both client and server
+            if (serverQuote.version > localQuote.version) {
+                // Server version is newer - use server data
+                mergedQuotes.push(serverQuote);
+                conflicts.push({
+                    id: localQuote.id,
+                    local: localQuote,
+                    server: serverQuote,
+                    resolved: 'server'
+                });
+            } else if (localQuote.localModified) {
+                // Local has modifications - keep local (will be sent to server)
+                mergedQuotes.push(localQuote);
+            } else {
+                // Same version, no conflicts
+                mergedQuotes.push(serverQuote);
+            }
+            quoteMap.delete(localQuote.id);
+        } else {
+            // Local quote doesn't exist on server - keep it
+            mergedQuotes.push(localQuote);
+        }
+    });
+    
+    // Add remaining server quotes (new quotes from server)
+    quoteMap.forEach(serverQuote => {
+        mergedQuotes.push(serverQuote);
+    });
+    
+    // Update the main quotes array
+    quotes = mergedQuotes;
+    
+    return conflicts;
+}
+
+// Show conflict notification
+function showConflictNotification(conflicts) {
+    const conflictNotification = document.getElementById('conflictNotification');
+    const resolveBtn = document.getElementById('resolveConflicts');
+    
+    conflictNotification.innerHTML = `
+        <strong>Conflict Detected!</strong> 
+        ${conflicts.length} quote(s) have conflicts between local and server versions.
+    `;
+    conflictNotification.style.display = 'block';
+    resolveBtn.style.display = 'inline-block';
+    
+    // Store conflicts for resolution
+    sessionStorage.setItem('pendingConflicts', JSON.stringify(conflicts));
+}
+
+// Hide conflict notification
+function hideConflictNotification() {
+    const conflictNotification = document.getElementById('conflictNotification');
+    const resolveBtn = document.getElementById('resolveConflicts');
+    
+    conflictNotification.style.display = 'none';
+    resolveBtn.style.display = 'none';
+    sessionStorage.removeItem('pendingConflicts');
+}
+
+// Show conflict resolution interface
+function showConflictResolution() {
+    const conflicts = JSON.parse(sessionStorage.getItem('pendingConflicts') || '[]');
+    
+    if (conflicts.length === 0) {
+        alert('No conflicts to resolve!');
+        return;
+    }
+    
+    const resolution = confirm(
+        `Found ${conflicts.length} conflict(s).\n\n` +
+        'Click OK to accept server versions, or Cancel to keep local versions.'
+    );
+    
+    if (resolution) {
+        // Accept server versions
+        conflicts.forEach(conflict => {
+            const index = quotes.findIndex(q => q.id === conflict.id);
+            if (index !== -1) {
+                quotes[index] = conflict.server;
+            }
+        });
+    } else {
+        // Keep local versions (mark them for server update)
+        conflicts.forEach(conflict => {
+            const index = quotes.findIndex(q => q.id === conflict.id);
+            if (index !== -1) {
+                quotes[index].localModified = true;
+                quotes[index].version = Math.max(quotes[index].version, conflict.server.version) + 1;
+            }
+        });
+    }
+    
+    saveQuotesToLocalStorage();
+    hideConflictNotification();
+    displayFilteredQuotes();
+    showSyncNotification('Conflicts resolved!', 'success');
+}
+
+// Show sync notification
+function showSyncNotification(message, type) {
+    // Create or update notification element
+    let notification = document.getElementById('syncNotification');
+    if (!notification) {
+        notification = document.createElement('div');
+        notification.id = 'syncNotification';
+        notification.className = 'sync-notification';
+        document.body.appendChild(notification);
+    }
+    
+    notification.textContent = message;
+    notification.className = `sync-notification ${type}`;
+    notification.style.display = 'block';
+    
+    // Auto-hide after 3 seconds
+    setTimeout(() => {
+        notification.style.display = 'none';
+    }, 3000);
 }
 
 // Export quotes to JSON file
@@ -325,7 +613,13 @@ function importFromJson() {
             }
             
             // Add imported quotes to existing quotes
-            quotes.push(...validQuotes);
+            quotes.push(...validQuotes.map(quote => ({
+                ...quote,
+                id: quote.id || generateId(),
+                version: quote.version || 1,
+                localModified: true
+            })));
+            
             saveQuotesToLocalStorage();
             
             // Update categories dropdown
@@ -393,6 +687,10 @@ function addStyles() {
             font-style: italic;
             color: #666;
         }
+        .sync-indicator {
+            color: #ff6b00;
+            font-weight: bold;
+        }
         button {
             padding: 10px 20px;
             background-color: #007bff;
@@ -405,7 +703,24 @@ function addStyles() {
         button:hover {
             background-color: #0056b3;
         }
-        .form-container, #dataControls {
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .sync-btn {
+            background-color: #28a745;
+        }
+        .sync-btn:hover {
+            background-color: #218838;
+        }
+        .resolve-btn {
+            background-color: #ffc107;
+            color: #212529;
+        }
+        .resolve-btn:hover {
+            background-color: #e0a800;
+        }
+        .form-container, #dataControls, .sync-controls {
             margin: 20px 0;
             padding: 15px;
             border: 1px solid #ddd;
@@ -425,10 +740,35 @@ function addStyles() {
             outline: none;
             border-color: #007bff;
         }
-        .filter-info, .session-info {
+        .filter-info, .session-info, .sync-status {
             margin: 10px 0;
             color: #666;
             font-size: 0.9em;
+        }
+        .conflict-notification {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .sync-notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            color: white;
+            font-weight: bold;
+            z-index: 1000;
+            display: none;
+        }
+        .sync-notification.success {
+            background-color: #28a745;
+        }
+        .sync-notification.error {
+            background-color: #dc3545;
         }
         .import-section {
             margin: 15px 0;
